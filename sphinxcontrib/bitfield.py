@@ -52,6 +52,7 @@ class BitfieldDirective(Directive):
         'trim': float,
         'legend': legend,
         'caption': directives.unchanged,
+        'fontcolor': str,
     }
 
     def run(self):

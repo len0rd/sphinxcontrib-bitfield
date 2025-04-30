@@ -77,5 +77,7 @@ The `bitfield` directive accepts the following options:
         space separated list of name and type optionally enclosed in quotes
     caption:
         String caption for the bitfield. If specified, the bitfield will be rendered as a figure
+    fontcolor
+        Specify the color for the font and stroke of the diagram. Can be a hex code ("#000000") or a color name. Default: 'black'
 
 For more details, see the `bit_field <https://github.com/Arth-ur/bitfield>`_ package.
