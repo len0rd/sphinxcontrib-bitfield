@@ -59,6 +59,10 @@ class BitfieldDirective(Directive):
         # remove 'caption' since its only used on the sphinx side and bit_field
         # doesnt recognize it
         caption = self.options.pop('caption', None)
+        builder = self.state.document.settings.env.app.builder.name
+        if builder == 'latex':
+            self.options['fontcolor'] = 'black'
+
 
         svg = jsonml_stringify(
             render(
