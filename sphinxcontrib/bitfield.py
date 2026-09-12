@@ -2,10 +2,43 @@ from docutils import nodes
 from docutils.parsers.rst import Directive, directives
 from bit_field import render, jsonml_stringify
 from json import loads
+from hashlib import sha256
+from pathlib import Path
 from shlex import split
 from base64 import b64encode
 from sphinx import addnodes
 from sphinx.util.nodes import set_source_info
+
+# builder formats the require image files instead of raw svg/html
+IMAGE_ONLY_FORMATS = ('confluence_storage',)
+
+# directory holding the generated image files, inside the build output
+IMAGE_DIR = '_bitfield'
+
+# confluence fails to render an svg attachment that has no xml declaration
+XML_DECLARATION = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>'
+
+
+def needs_image_file(builder):
+    """Whether a builder needs the diagram as an image file rather than inline"""
+    return getattr(builder, 'format', None) in IMAGE_ONLY_FORMATS
+
+
+def write_svg(builder, svg):
+    """Write a rendered diagram into the build output, returning its uri
+
+    Files are named after a hash of their contents, so identical diagrams share
+    one file. The confluence builder resolves an image path it cannot find in
+    the source tree against the output directory, and uploads it as a page
+    attachment.
+    """
+    filename = sha256(svg.encode()).hexdigest()[:16] + '.svg'
+
+    path = Path(builder.outdir) / IMAGE_DIR / filename
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(XML_DECLARATION + '\n' + svg, encoding='utf-8')
+
+    return f'/{IMAGE_DIR}/{filename}'
 
 
 def legend(s):
@@ -59,10 +92,9 @@ class BitfieldDirective(Directive):
         # remove 'caption' since its only used on the sphinx side and bit_field
         # doesnt recognize it
         caption = self.options.pop('caption', None)
-        builder = self.state.document.settings.env.app.builder.name
-        if builder == 'latex':
+        builder = self.state.document.settings.env.app.builder
+        if builder.name == 'latex':
             self.options['fontcolor'] = 'black'
-
 
         svg = jsonml_stringify(
             render(
@@ -71,12 +103,15 @@ class BitfieldDirective(Directive):
             )
         )
 
-        uri = 'data:image/svg+xml;base64,' + b64encode(svg.encode()).decode()
+        if needs_image_file(builder):
+            content = [nodes.image('', uri=write_svg(builder, svg))]
+        else:
+            uri = 'data:image/svg+xml;base64,' + b64encode(svg.encode()).decode()
 
-        onlynode = addnodes.only(expr='latex')
-        onlynode += nodes.image('', uri=uri)
+            onlynode = addnodes.only(expr='latex')
+            onlynode += nodes.image('', uri=uri)
 
-        content = [nodes.raw('', svg, format='html'), onlynode]
+            content = [nodes.raw('', svg, format='html'), onlynode]
 
         if caption is None:
             return content
